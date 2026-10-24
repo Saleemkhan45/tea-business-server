@@ -1,0 +1,10 @@
+const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character])
+
+export function emailChangeVerification({ email, url }) {
+  const address = escapeHtml(email), link = escapeHtml(url)
+  return {
+    subject: 'Verify your Tea Business sign-in email',
+    text: `Tea Business — Account Security\n\nYou requested ${email} as your new sign-in email.\nConfirm within 15 minutes: ${url}\n\nYour existing email and password remain unchanged until you confirm. Confirmation signs out existing sessions. Only the latest requested link works.\nIf you did not request this, ignore this message.`,
+    html: `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;padding:24px;background:#f1f5f9;font-family:Arial,sans-serif;color:#172033"><table role="presentation" style="width:100%;max-width:560px;margin:auto;background:#fff;border:1px solid #dce3ed;border-radius:16px"><tr><td style="padding:32px"><p style="color:#2563eb;font-size:14px;font-weight:bold">TEA BUSINESS · ACCOUNT SECURITY</p><h1 style="font-size:24px;line-height:1.3">Verify your new sign-in email</h1><p style="line-height:1.7">You requested <strong>${address}</strong> as your new sign-in email.</p><p style="padding:16px 0"><a href="${link}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:14px 22px;border-radius:8px;font-weight:bold">Verify Email</a></p><p style="line-height:1.7">This link expires in <strong>15 minutes</strong>. Your current sign-in email stays active until you confirm. Your password, role and shop stay unchanged. Confirmation signs out existing sessions.</p><p style="line-height:1.7;color:#64748b">Only the latest requested link works. If you did not request this change, ignore this message.</p><p style="font-size:12px;line-height:1.7;word-break:break-all">If the button does not work, open this link:<br><a href="${link}">${link}</a></p></td></tr></table></body></html>`,
+  }
+}
