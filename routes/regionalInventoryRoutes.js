@@ -11,6 +11,7 @@ regionalInventoryRoutes.get('/regions', async (req, res) => res.json({ regions: 
 regionalInventoryRoutes.get('/overview', async (req, res) => res.json(await reports.regionalOverview({ ...scope(req), from: req.query.from, to: req.query.to })))
 regionalInventoryRoutes.post('/regions', async (req, res) => res.status(201).json({ region: await inventory.createRegion({ ...req.body, ...scope(req) }) }))
 regionalInventoryRoutes.patch('/regions/:regionId', async (req, res) => res.json({ region: await inventory.updateRegion({ ...req.body, regionId: req.params.regionId, ...scope(req) }) }))
+regionalInventoryRoutes.delete('/regions/:regionId', async (req, res) => res.json(await inventory.deleteRegion({ regionId: req.params.regionId, ...scope(req) })))
 regionalInventoryRoutes.get('/regions/:regionId/report', async (req, res) => res.json(await reports.regionReport({ ...scope(req), regionId: req.params.regionId, from: req.query.from, to: req.query.to, itemId: req.query.itemId })))
 regionalInventoryRoutes.get('/products', async (req, res) => res.json({ products: await inventory.listProducts(req.user.shopId) }))
 regionalInventoryRoutes.get('/product-options', (req, res) => res.json({ categories: ITEM_TEA_TYPES }))
