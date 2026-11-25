@@ -1,5 +1,5 @@
 import express from 'express'
-import { createCustomer, getCustomerById, listCustomers } from '../controllers/customerDirectoryController.js'
+import { createCustomer, deleteCustomer, getCustomerById, listCustomers } from '../controllers/customerDirectoryController.js'
 import {
   createAdjustment,
   createOpeningBalance,
@@ -41,6 +41,7 @@ customerLedgerRoutes.use(requireAuth)
 customerLedgerRoutes.get('/', validate(customerDirectoryQuerySchema, 'query'), listCustomers)
 customerLedgerRoutes.post('/', validate(customerBodySchema), createCustomer)
 customerLedgerRoutes.get('/:customerId', validate(customerParamsSchema, 'params'), getCustomerById)
+customerLedgerRoutes.delete('/:customerId', validate(customerParamsSchema, 'params'), deleteCustomer)
 customerLedgerRoutes.get('/:customerId/ledger',
   validate(customerParamsSchema, 'params'), validate(ledgerQuerySchema, 'query'), getLedger)
 customerLedgerRoutes.get('/:customerId/summary',

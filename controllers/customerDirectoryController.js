@@ -19,6 +19,15 @@ export async function getCustomerById(req, res) {
   res.json({ customer })
 }
 
+export async function deleteCustomer(req, res) {
+  const result = await customerDirectoryService.deleteCustomer({
+    shop: req.user.shopId,
+    customerId: req.params.customerId,
+    role: req.user.role,
+  })
+  res.json(result)
+}
+
 export async function listCustomers(req, res) {
   const directory = await customerDirectoryService.listCustomers({
     shop: req.user.shopId,

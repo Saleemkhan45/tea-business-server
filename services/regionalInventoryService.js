@@ -7,6 +7,7 @@ import { Item } from '../models/Item.js'
 import { User } from '../models/User.js'
 import { Sale } from '../models/Sale.js'
 import { Purchase } from '../models/Purchase.js'
+import { Supplier } from '../models/Supplier.js'
 import { regionInputSchema, regionCreateSchema, regionalDate, regionalSettingsSchema } from '../schemas/regionalSchemas.js'
 import { getBusinessDate } from '../utils/businessDay.js'
 import { ITEM_TEA_TYPES } from '../constants/teaCategories.js'
@@ -99,6 +100,31 @@ export async function updateRegion({ shop, actor, regionId, ...input }) {
   const region = await Region.findOneAndUpdate({ shop, _id: objectId(regionId, 'Region') }, { $set: { ...fields, updatedBy: actor } }, { new: true, runValidators: true })
   if (!region) throw inventoryError('Region not found.', 404)
   return region
+}
+// Regions with stock, stock movements, sales or purchases are kept so inventory and reports stay accurate.
+export async function deleteRegion({ shop, actor, regionId }) {
+  regionId = objectId(regionId, 'Region')
+  await requireManager(shop, actor)
+  const session = await mongoose.startSession()
+  try {
+    return await session.withTransaction(async () => {
+      await requireManager(shop, actor, session)
+      const region = await Region.findOne({ shop, _id: regionId }).session(session).lean()
+      if (!region) throw inventoryError('Region not found.', 404)
+      const [stocked, operation, sale, purchase] = await Promise.all([
+        RegionalStock.exists({ shop, region: regionId, quantityGrams: { $ne: 0 } }).session(session),
+        RegionalStockOperation.exists({ shop, $or: [{ region: regionId }, { destination: regionId }] }).session(session),
+        Sale.exists({ shop, $or: [{ sellingRegion: regionId }, { 'inventoryMovements.region': regionId }] }).session(session),
+        Purchase.exists({ shop, receivingRegion: regionId }).session(session),
+      ])
+      if (stocked) throw inventoryError('This region still has stock. Move or correct its stock to 0 before deleting.', 409)
+      if (operation || sale || purchase) throw inventoryError('This region has stock, sales or purchase history and cannot be deleted. Mark it inactive instead.', 409)
+      await RegionalStock.deleteMany({ shop, region: regionId }, { session })
+      await Supplier.updateMany({ shop, regions: regionId }, { $pull: { regions: regionId } }, { session })
+      await Region.deleteOne({ shop, _id: regionId }, { session })
+      return { deleted: true, id: regionId }
+    })
+  } finally { await session.endSession() }
 }
 export async function listProducts(shop) {
   return Item.find({ shop }).select('_id name teaType status sellingPrice lowStockThreshold').sort({ name: 1 }).lean()

@@ -3,7 +3,7 @@ vi.mock('../services/actionAuthorization.js', async importOriginal => ({ ...awai
 import express from 'express'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { env } from '../config/env.js'
-const service = vi.hoisted(() => ({ listRegions: vi.fn(), createRegion: vi.fn(), updateRegion: vi.fn(), listProducts: vi.fn(), createProduct: vi.fn(), listInventory: vi.fn(), assignProduct: vi.fn(), removeUnusedAssignment: vi.fn(), updateRegionalSettings: vi.fn(), regionHistory: vi.fn(), recordStockOperation: vi.fn() }))
+const service = vi.hoisted(() => ({ listRegions: vi.fn(), createRegion: vi.fn(), updateRegion: vi.fn(), listProducts: vi.fn(), createProduct: vi.fn(), listInventory: vi.fn(), assignProduct: vi.fn(), removeUnusedAssignment: vi.fn(), deleteRegion: vi.fn(), updateRegionalSettings: vi.fn(), regionHistory: vi.fn(), recordStockOperation: vi.fn() }))
 const reports = vi.hoisted(() => ({ regionalOverview: vi.fn(), regionReport: vi.fn() }))
 vi.mock('../services/regionalReportService.js', () => reports)
 const auth = vi.hoisted(() => ({ authenticate: vi.fn() }))
@@ -41,12 +41,15 @@ describe('regional API offline authentication and scope', () => {
     expect((await fetch(url, { method: 'DELETE', headers: { Cookie: 'offline', Origin: env.clientOrigin, 'X-CSRF-Token': 'offline-token' } })).status).toBe(200)
     expect(service.removeUnusedAssignment).toHaveBeenCalledWith({ shop: 'authorized-shop', actor: 'operator', regionId: 'r1', itemId: 'p1' })
   })
-  it('keeps region updates scoped and does not expose a hard-delete endpoint', async () => {
+  it('keeps region updates and deletes scoped to the authenticated shop and require CSRF', async () => {
     const headers = { 'Content-Type': 'application/json', Cookie: 'offline', Origin: env.clientOrigin, 'X-CSRF-Token': 'offline-token' }
     const response = await fetch(`${base}/regions/r1`, { method: 'PATCH', headers, body: JSON.stringify({ shop: 'foreign', actor: 'forged', status: 'inactive' }) })
     expect(response.status).toBe(200)
     expect(service.updateRegion).toHaveBeenCalledWith({ shop: 'authorized-shop', actor: 'operator', regionId: 'r1', status: 'inactive' })
-    expect((await fetch(`${base}/regions/r1`, { method: 'DELETE', headers })).status).toBe(404)
+    expect((await fetch(`${base}/regions/r1?shop=foreign`, { method: 'DELETE', headers: { Cookie: 'offline', Origin: env.clientOrigin } })).status).toBe(403)
+    expect(service.deleteRegion).not.toHaveBeenCalled()
+    expect((await fetch(`${base}/regions/r1?shop=foreign`, { method: 'DELETE', headers })).status).toBe(200)
+    expect(service.deleteRegion).toHaveBeenCalledWith({ shop: 'authorized-shop', actor: 'operator', regionId: 'r1' })
   })
   it('scopes dated region reports and never accepts a financial query shop override', async () => {
     expect((await fetch(`${base}/regions/r1/report?shop=foreign&from=2026-10-01&to=2026-10-15`, { headers: { Cookie: 'offline' } })).status).toBe(200)

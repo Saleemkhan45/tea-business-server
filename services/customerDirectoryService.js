@@ -8,6 +8,10 @@ import {
   CUSTOMER_DIRECTORY_SEARCH_MAX_LENGTH,
 } from '../constants/customerDirectory.js'
 import { Customer, CUSTOMER_STATUSES } from '../models/Customer.js'
+import { CustomerLedgerTransaction } from '../models/CustomerLedgerTransaction.js'
+import { CustomerPayment } from '../models/CustomerPayment.js'
+import { Sale } from '../models/Sale.js'
+import { CollectionOccurrence, CollectionSchedule } from '../models/CollectionSchedule.js'
 import * as ledgerRepository from '../repositories/customerLedgerTransactionRepository.js'
 import * as customerLedgerService from './customerLedgerService.js'
 
@@ -188,6 +192,33 @@ export async function listCustomers(input = {}, options = {}) {
       pages: Math.max(1, Math.ceil(total / limit)),
     },
   }
+}
+
+function httpError(message, statusCode) {
+  return Object.assign(new Error(message), { statusCode })
+}
+
+// Customers with any financial history are kept so the khata, sales and reports stay accurate.
+export async function deleteCustomer(input = {}) {
+  const shop = requireObjectId(input.shop, 'Shop')
+  const customerId = requireObjectId(input.customerId, 'Customer')
+  if (!['owner', 'admin'].includes(input.role)) throw httpError('Only an owner or admin can delete customers.', 403)
+  const customer = await Customer.findOne({ _id: customerId, shop }).select('_id').lean()
+  if (!customer) throw httpError('Customer not found.', 404)
+  const [ledgerEntry, payment, sale] = await Promise.all([
+    CustomerLedgerTransaction.exists({ shop, customer: customerId }),
+    CustomerPayment.exists({ shop, customer: customerId }),
+    Sale.exists({ shop, customer: customerId }),
+  ])
+  if (ledgerEntry || payment || sale) {
+    throw httpError('This customer has sales or khata history and cannot be deleted. Mark the customer inactive instead.', 409)
+  }
+  await Promise.all([
+    CollectionOccurrence.deleteMany({ shop, customer: customerId }),
+    CollectionSchedule.deleteMany({ shop, customer: customerId }),
+  ])
+  await Customer.deleteOne({ _id: customerId, shop })
+  return { deleted: true, id: String(customerId) }
 }
 
 export async function createCustomer(input, options = {}) {
